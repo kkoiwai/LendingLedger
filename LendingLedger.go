@@ -105,20 +105,19 @@ func (t *SimpleChaincode) Invoke(stub *shim.ChaincodeStub, function string, args
 //=================================================================================================================================
 func (t *SimpleChaincode) Query(stub *shim.ChaincodeStub, function string, args []string) ([]byte, error) {
 
-	if function == "get_customer" {
+	if function == "get_all_requests" {
 
-		if function == "get_customer" {
 
-			if len(args) != 2 {
-				fmt.Printf("Incorrect number of arguments passed"); return nil, errors.New("QUERY: Incorrect number of arguments passed")
-			}
-
-			//customer_id := args[0]
-			//receiver_id := args[1]
-			//
-			//return t.get_customer(stub, customer_id, receiver_id)
-
+		if len(args) != 0 {
+			fmt.Printf("Incorrect number of arguments passed"); return nil, errors.New("QUERY: Incorrect number of arguments passed")
 		}
+
+		//customer_id := args[0]
+		//receiver_id := args[1]
+		//
+		return t.get_all_requests(stub)
+
+
 	}
 	return nil, errors.New("QUERY: No such function.")
 
@@ -127,12 +126,23 @@ func (t *SimpleChaincode) Query(stub *shim.ChaincodeStub, function string, args 
 // state changing function should;
 //  - receive timestamp as an argument (to keep consistency between validating peers)
 //  - should validate the received timestamp with
-//  -- it is within 5min of the machine time
+//  -- it is within 5min of the machine time => validate_timestamp
 //  -- it is larger than the previous state
 
 func (t *SimpleChaincode) create_request(stub *shim.ChaincodeStub, lender_id string, lendee_id string, timestamp string, items []string) ([]byte, error) {
 
 	return nil, nil
+}
+
+
+func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, error) {
+
+	return nil, nil
+}
+
+func (t *SimpleChaincode) add_item(stub *shim.ChaincodeStub, request_id int64, item_name string) (error) {
+
+	return nil
 }
 
 
@@ -144,4 +154,16 @@ func (t *SimpleChaincode) validate_timestamp(timestamp string) (bool) {
 		return true
 	}
 	return false
+}
+
+
+//=================================================================================================================================
+//	 Main - main - Starts up the chaincode
+//=================================================================================================================================
+func main() {
+
+	err := shim.Start(new(SimpleChaincode))
+	if err != nil {
+		fmt.Printf("Error starting Chaincode: %s", err)
+	}
 }
