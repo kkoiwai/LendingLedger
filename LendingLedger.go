@@ -162,6 +162,14 @@ func (t *SimpleChaincode) Query(stub *shim.ChaincodeStub, function string, args 
 
 		return t.get_all(stub)
 
+	}else if function == "get_request" {
+
+		if len(args) != 1 {
+			fmt.Printf("Incorrect number of arguments passed"); return nil, errors.New("QUERY: Incorrect number of arguments passed")
+		}
+		request_id := args[0]
+		return t.get_request(stub,request_id)
+
 	}
 	return nil, errors.New("QUERY: No such function.")
 
