@@ -178,7 +178,7 @@ func (t *SimpleChaincode) create_request(stub *shim.ChaincodeStub, lender_id str
 
 	// Register Items
 	for i, itemName := range items{
-		s:=strings.Repeat("0",5) + string(i)
+		s:=strings.Repeat("0",5) + strconv.Itoa(i)
 		item_id:=s[len(s)-5:] // 00000 012345
 		itemKey:="ITEM/"+request_id+"/"+ item_id
 		item:=Item{
@@ -334,7 +334,7 @@ func next_req_ctr(stub *shim.ChaincodeStub) (string) {
 		panic("Counter overflow.")
 	}
 
-	str:=strings.Repeat("0",5)+ string(ctr + 1)
+	str:=strings.Repeat("0",5)+ strconv.Itoa(ctr + 1)
 	return str[len(str)-5:]
 }
 
@@ -345,7 +345,7 @@ func increment_req_ctr(stub *shim.ChaincodeStub) () {
 	}
 	ctr, err := strconv.Atoi(string(next_ctr) )
 	if err != nil {panic(err)}
-	str:=strings.Repeat("0",5)+ string(ctr + 1)
+	str:=strings.Repeat("0",5)+ strconv.Itoa(ctr + 1)
 	stub.PutState("REQ_CTR",[]byte(str[len(str)-5:]))
 	return
 }
