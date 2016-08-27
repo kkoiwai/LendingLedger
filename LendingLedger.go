@@ -285,6 +285,57 @@ func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, er
 }
 
 
+func (t *SimpleChaincode) get_request(stub *shim.ChaincodeStub, request_id string) ([]byte, error) {
+
+	var req Request
+	var record RequestRecord
+	var items []Item
+	var item Item
+	var hist RequestHistory
+
+
+	valAsbytes, err := stub.GetState("REQ/"+request_id)
+	if err != nil {return nil, errors.New("Error getting customer data of "+ request_id)}
+
+	if err = json.Unmarshal(valAsbytes, &req) ; err != nil {
+		return nil, errors.New("Error unmarshalling data "+string(valAsbytes))
+	}
+
+	itemsIter, err := stub.RangeQueryState("ITEM/"+req.RequestId+"/", "ITEM/"+req.RequestId+"/~")
+	if err != nil {
+		return nil, errors.New("Unable to start the iterator")
+	}
+	for itemsIter.HasNext() {
+		_, itemAsbytes, err := itemsIter.Next()
+		if err != nil {	return nil, fmt.Errorf("keys operation failed. Error accessing state: %s", err)	}
+		if err = json.Unmarshal(itemAsbytes, &item) ; err != nil { return nil, errors.New("Error unmarshalling data "+string(itemAsbytes))}
+		items = append(items,item)
+	}
+	itemsIter.Close()
+
+	statusKey:="REQ_HIST/"+req.RequestId+"/"+req.LatestHistoryId
+	histAsbytes, err := stub.GetState(statusKey)
+	if err != nil {return nil, errors.New("Error getting customer data of "+statusKey)}
+	if err = json.Unmarshal(histAsbytes, &hist) ; err != nil {return nil, errors.New("Error unmarshalling data "+string(histAsbytes))}
+
+
+	record = RequestRecord{
+		RequestId:req.RequestId ,
+		LenderId:req.LenderId ,
+		LendeeId:req.LendeeId ,
+		LatestHistoryId:req.LatestHistoryId ,
+		UpdatedTimeStamp:hist.TimeStamp,
+		Items:items  ,
+		Status:status_in_string(hist.StatusTo)  ,
+	}
+
+	bytes, err := json.Marshal(record)
+	if err != nil {
+		return nil, errors.New("Error creating Reqests record")
+	}
+	return []byte(bytes), nil
+}
+
 func (t *SimpleChaincode) get_all(stub *shim.ChaincodeStub) ([]byte, error) {
 
 	result := "["
