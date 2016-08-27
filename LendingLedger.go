@@ -10,6 +10,7 @@ import (
 	"math"
 	"strings"
 	"encoding/json"
+	"sort"
 )
 
 type  SimpleChaincode struct {
@@ -51,6 +52,21 @@ type RequestHistory struct { // REQ_HIST/00001/00001
 	Note string `json:"note"`
 }
 
+// 履歴を並べ替える用
+type RequestHistories []RequestHistory
+func (h RequestHistories) Len() int {
+	return len(h)
+}
+func (h RequestHistories)  Swap(i, j int)  {
+	h[i], h[j] = h[j], h[i]
+}
+func (h RequestHistories)  Less(i, j int) bool {
+	xi, _ := strconv.Atoi(h[i].HistoryId)
+	xj, _ := strconv.Atoi(h[j].HistoryId)
+	return xi < xj
+
+}
+
 
 // 以下結果返し用
 type RequestSet struct{
@@ -65,6 +81,7 @@ type RequestRecord struct{
 	UpdatedTimeStamp string `json:"updated_timestamp"`
 	Items []Item `json:"items"`
 	Status string `json:"status"`
+	Histories []RequestHistory `json:"histories"`
 }
 
 
@@ -291,6 +308,8 @@ func (t *SimpleChaincode) get_request(stub *shim.ChaincodeStub, request_id strin
 	var record RequestRecord
 	var items []Item
 	var item Item
+	//var histories []RequestHistory
+	var histories RequestHistories
 	var hist RequestHistory
 
 
@@ -318,6 +337,18 @@ func (t *SimpleChaincode) get_request(stub *shim.ChaincodeStub, request_id strin
 	if err != nil {return nil, errors.New("Error getting customer data of "+statusKey)}
 	if err = json.Unmarshal(histAsbytes, &hist) ; err != nil {return nil, errors.New("Error unmarshalling data "+string(histAsbytes))}
 
+	histIter, err := stub.RangeQueryState("REQ_HIST/"+req.RequestId+"/", "REQ_HIST/"+req.RequestId+"/~")
+	if err != nil {
+		return nil, errors.New("Unable to start the iterator")
+	}
+	for histIter.HasNext() {
+		_, hiAsbytes, err := itemsIter.Next()
+		if err != nil {	return nil, fmt.Errorf("keys operation failed. Error accessing state: %s", err)	}
+		if err = json.Unmarshal(hiAsbytes, &hist) ; err != nil { return nil, errors.New("Error unmarshalling data "+string(hiAsbytes))}
+		histories = append(histories,hist)
+	}
+	histIter.Close()
+	sort.Sort(histories)
 
 	record = RequestRecord{
 		RequestId:req.RequestId ,
@@ -327,6 +358,7 @@ func (t *SimpleChaincode) get_request(stub *shim.ChaincodeStub, request_id strin
 		UpdatedTimeStamp:hist.TimeStamp,
 		Items:items  ,
 		Status:status_in_string(hist.StatusTo)  ,
+		Histories:histories,
 	}
 
 	bytes, err := json.Marshal(record)
