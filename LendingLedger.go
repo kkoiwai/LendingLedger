@@ -73,7 +73,7 @@ type RequestRecord struct{
 //==============================================================================================================================
 func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args []string) ([]byte, error) {
 	// init request_id counter
-	err := stub.PutState("REC_CTR", []byte("00000"))
+	err := stub.PutState("REQ_CTR", []byte("00000"))
 	if err != nil {
 		return nil, errors.New("Unable to put the state")
 	}
@@ -134,9 +134,6 @@ func (t *SimpleChaincode) Query(stub *shim.ChaincodeStub, function string, args 
 			fmt.Printf("Incorrect number of arguments passed"); return nil, errors.New("QUERY: Incorrect number of arguments passed")
 		}
 
-		//customer_id := args[0]
-		//receiver_id := args[1]
-		//
 		return t.get_all_requests(stub)
 
 
