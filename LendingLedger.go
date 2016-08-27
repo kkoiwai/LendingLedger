@@ -178,9 +178,8 @@ func (t *SimpleChaincode) create_request(stub *shim.ChaincodeStub, lender_id str
 
 	// Register Items
 	for i, itemName := range items{
-		s:=strings.Repeat("0",5)+ string(i)
-		l:=len(s)
-		item_id:=s[l-5:l-1] // 00000
+		s:=strings.Repeat("0",5) + string(i)
+		item_id:=s[len(s)-5:] // 00000 012345
 		itemKey:="ITEM/"+request_id+"/"+ item_id
 		item:=Item{
 			RequestId:request_id,
@@ -206,7 +205,7 @@ func (t *SimpleChaincode) create_request(stub *shim.ChaincodeStub, lender_id str
 		TimeStamp:timestamp,
 		Note:"",
 	}
-	histKey := "REQ_HIST/"+hist.HistoryId+"/"+hist.HistoryId
+	histKey := "REQ_HIST/"+hist.RequestId+"/"+hist.HistoryId
 	histBytes, err := json.Marshal(hist)
 	if err != nil {
 		return nil, errors.New("Error creating Reqest record")
@@ -336,8 +335,7 @@ func next_req_ctr(stub *shim.ChaincodeStub) (string) {
 	}
 
 	str:=strings.Repeat("0",5)+ string(ctr + 1)
-	l:=len(str)
-	return str[l-5:l-1]
+	return str[len(str)-5:]
 }
 
 func increment_req_ctr(stub *shim.ChaincodeStub) () {
@@ -347,7 +345,8 @@ func increment_req_ctr(stub *shim.ChaincodeStub) () {
 	}
 	ctr, err := strconv.Atoi(string(next_ctr) )
 	if err != nil {panic(err)}
-	stub.PutState("REQ_CTR",[]byte(string(ctr + 1)))
+	str:=strings.Repeat("0",5)+ string(ctr + 1)
+	stub.PutState("REQ_CTR",[]byte(str[len(str)-5:]))
 	return
 }
 
