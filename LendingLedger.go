@@ -232,10 +232,10 @@ func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, er
 	for reqsIter.HasNext() {
 		_, valAsbytes, iterErr := reqsIter.Next()
 		if iterErr != nil {
-			return nil, fmt.Errorf("keys operation failed. Error accessing state: %s", err)
+			return nil, errors.New("keys operation failed. Error accessing next state")
 		}
 
-		if err = json.Unmarshal(valAsbytes, req) ; err != nil {
+		if err = json.Unmarshal(valAsbytes, &req) ; err != nil {
 			return nil, errors.New("Error unmarshalling data "+string(valAsbytes))
 		}
 
@@ -246,7 +246,7 @@ func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, er
 		for itemsIter.HasNext() {
 			_, itemAsbytes, err := itemsIter.Next()
 			if err != nil {	return nil, fmt.Errorf("keys operation failed. Error accessing state: %s", err)	}
-			if err = json.Unmarshal(itemAsbytes, item) ; err != nil { return nil, errors.New("Error unmarshalling data "+string(itemAsbytes))}
+			if err = json.Unmarshal(itemAsbytes, &item) ; err != nil { return nil, errors.New("Error unmarshalling data "+string(itemAsbytes))}
 			items = append(items,item)
 		}
 		itemsIter.Close()
@@ -254,7 +254,7 @@ func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, er
 		statusKey:="REQ_HIST/"+req.RequestId+"/"+req.LatestHistoryId
 		histAsbytes, err := stub.GetState(statusKey)
 		if err != nil {return nil, errors.New("Error getting customer data of "+statusKey)}
-		if err = json.Unmarshal(histAsbytes, hist) ; err != nil {return nil, errors.New("Error unmarshalling data "+string(histAsbytes))}
+		if err = json.Unmarshal(histAsbytes, &hist) ; err != nil {return nil, errors.New("Error unmarshalling data "+string(histAsbytes))}
 
 
 		record = RequestRecord{
