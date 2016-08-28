@@ -26,7 +26,12 @@ const (
 
 const MAX_TIME_DIFF_IN_MIN = 5 // to validate timestamp
 
-type Request struct {
+const REQ_CTR_KEY = "REQ_CTR"
+const REQ_KEY_PREFIX = "REQ/"
+const ITEM_KEY_PREFIX = "ITEM/"
+const HIST_KEY_PREFIX = "REQ_HIST/"
+
+type Request struct { // REQ/00001
 	RequestId  string `json:"request_id"`  // 00001
 	LenderId string `json:"lender_id"`
 	LendeeId string `json:"lendee_id"`
@@ -90,7 +95,7 @@ type RequestRecord struct{
 //==============================================================================================================================
 func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args []string) ([]byte, error) {
 	// init request_id counter
-	err := stub.PutState("REQ_CTR", []byte("00000"))
+	err := stub.PutState(REQ_CTR_KEY, []byte("00000"))
 	if err != nil {
 		return nil, errors.New("Unable to put the state")
 	}
@@ -185,7 +190,7 @@ func (t *SimpleChaincode) create_request(stub *shim.ChaincodeStub, lender_id str
 
 	// Register Request
 	request_id := next_req_ctr(stub)
-	reqKey := "REQ/"+request_id
+	reqKey := REQ_KEY_PREFIX + request_id
 	request:= Request{
 		RequestId:request_id,
 		LenderId:lender_id,
@@ -205,7 +210,7 @@ func (t *SimpleChaincode) create_request(stub *shim.ChaincodeStub, lender_id str
 	for i, itemName := range items{
 		s:=strings.Repeat("0",5) + strconv.Itoa(i)
 		item_id:=s[len(s)-5:] // 00000 012345
-		itemKey:="ITEM/"+request_id+"/"+ item_id
+		itemKey:=ITEM_KEY_PREFIX + request_id+"/"+ item_id
 		item:=Item{
 			RequestId:request_id,
 			ItemId:item_id,
@@ -230,7 +235,7 @@ func (t *SimpleChaincode) create_request(stub *shim.ChaincodeStub, lender_id str
 		TimeStamp:timestamp,
 		Note:"",
 	}
-	histKey := "REQ_HIST/"+hist.RequestId+"/"+hist.HistoryId
+	histKey := HIST_KEY_PREFIX + hist.RequestId+"/"+hist.HistoryId
 	histBytes, err := json.Marshal(hist)
 	if err != nil {
 		return nil, errors.New("Error creating Reqest record")
@@ -254,7 +259,7 @@ func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, er
 	var item Item
 	var hist RequestHistory
 
-	reqsIter, err := stub.RangeQueryState("REQ/", "REQ/~")
+	reqsIter, err := stub.RangeQueryState(REQ_KEY_PREFIX, REQ_KEY_PREFIX + "~")
 	if err != nil {
 		return nil, errors.New("Unable to start the iterator")
 	}
@@ -271,7 +276,7 @@ func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, er
 			return nil, errors.New("Error unmarshalling data "+string(valAsbytes))
 		}
 
-		itemsIter, err := stub.RangeQueryState("ITEM/"+req.RequestId+"/", "ITEM/"+req.RequestId+"/~")
+		itemsIter, err := stub.RangeQueryState( ITEM_KEY_PREFIX +req.RequestId+"/", ITEM_KEY_PREFIX +req.RequestId+"/~")
 		if err != nil {
 			return nil, errors.New("Unable to start the iterator")
 		}
@@ -283,7 +288,7 @@ func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, er
 		}
 		itemsIter.Close()
 
-		statusKey:="REQ_HIST/"+req.RequestId+"/"+req.LatestHistoryId
+		statusKey:= HIST_KEY_PREFIX +req.RequestId+"/"+req.LatestHistoryId
 		histAsbytes, err := stub.GetState(statusKey)
 		if err != nil {return nil, errors.New("Error getting customer data of "+statusKey)}
 		if err = json.Unmarshal(histAsbytes, &hist) ; err != nil {return nil, errors.New("Error unmarshalling data "+string(histAsbytes))}
@@ -320,38 +325,37 @@ func (t *SimpleChaincode) get_request(stub *shim.ChaincodeStub, request_id strin
 	var histories RequestHistories
 	var hist RequestHistory
 
-
-	valAsbytes, err := stub.GetState("REQ/"+request_id)
-	if err != nil {return nil, errors.New("Error getting customer data of "+ request_id)}
-
+	// get request
+	valAsbytes, err := stub.GetState(REQ_KEY_PREFIX + request_id)
+	if err != nil {return nil, errors.New("Error getting request data of "+ request_id)}
 	if err = json.Unmarshal(valAsbytes, &req) ; err != nil {
 		return nil, errors.New("Error unmarshalling data "+string(valAsbytes))
 	}
 
-	itemsIter, err := stub.RangeQueryState("ITEM/"+req.RequestId+"/", "ITEM/"+req.RequestId+"/~")
+	itemsIter, err := stub.RangeQueryState(ITEM_KEY_PREFIX +req.RequestId+"/", ITEM_KEY_PREFIX + req.RequestId+"/~")
 	if err != nil {
 		return nil, errors.New("Unable to start the iterator")
 	}
 	for itemsIter.HasNext() {
 		_, itemAsbytes, err := itemsIter.Next()
-		if err != nil {	return nil, fmt.Errorf("keys operation failed. Error accessing state: %s", err)	}
+		if err != nil {	return nil, errors.New("Error getting items related to "+ request_id)	}
 		if err = json.Unmarshal(itemAsbytes, &item) ; err != nil { return nil, errors.New("Error unmarshalling data "+string(itemAsbytes))}
 		items = append(items,item)
 	}
 	itemsIter.Close()
 
-	statusKey:="REQ_HIST/"+req.RequestId+"/"+req.LatestHistoryId
+	statusKey:= HIST_KEY_PREFIX + req.RequestId+"/"+req.LatestHistoryId
 	histAsbytes, err := stub.GetState(statusKey)
-	if err != nil {return nil, errors.New("Error getting customer data of "+statusKey)}
+	if err != nil {return nil, errors.New("Error getting history data of "+statusKey)}
 	if err = json.Unmarshal(histAsbytes, &hist) ; err != nil {return nil, errors.New("Error unmarshalling data "+string(histAsbytes))}
 
-	histIter, err := stub.RangeQueryState("REQ_HIST/"+req.RequestId+"/", "REQ_HIST/"+req.RequestId+"/~")
+	histIter, err := stub.RangeQueryState( HIST_KEY_PREFIX + req.RequestId+"/", HIST_KEY_PREFIX +req.RequestId+"/~")
 	if err != nil {
 		return nil, errors.New("Unable to start the iterator")
 	}
 	for histIter.HasNext() {
 		_, hiAsbytes, err := itemsIter.Next()
-		if err != nil {	return nil, fmt.Errorf("keys operation failed. Error accessing state: %s", err)	}
+		if err != nil {	return nil, errors.New("Error getting history data ")	}
 		if err = json.Unmarshal(hiAsbytes, &hist) ; err != nil { return nil, errors.New("Error unmarshalling data "+string(hiAsbytes))}
 		histories = append(histories,hist)
 	}
@@ -415,7 +419,7 @@ func validate_timestamp(timestamp string) (bool) {
 }
 
 func next_req_ctr(stub *shim.ChaincodeStub) (string) {
-	next_ctr, err := stub.GetState("REQ_CTR")
+	next_ctr, err := stub.GetState(REQ_CTR_KEY)
 	if err != nil || len(next_ctr) == 0 {
 		panic("Failed to GetState")
 	}
@@ -430,7 +434,7 @@ func next_req_ctr(stub *shim.ChaincodeStub) (string) {
 }
 
 func increment_req_ctr(stub *shim.ChaincodeStub) () {
-	next_ctr, err := stub.GetState("REQ_CTR")
+	next_ctr, err := stub.GetState(REQ_CTR_KEY)
 	if err != nil || len(next_ctr) == 0 {
 		panic("Failed to GetState")
 	}
