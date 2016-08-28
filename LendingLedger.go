@@ -53,6 +53,8 @@ type RequestHistory struct { // REQ_HIST/00001/00001
 	//ChangerId string `json:"changer_id"`
 	StatusFrom int `json:"status_from"`
 	StatusTo int `json:"status_to"`
+	StatusFrom_s string `json:"status_from_s"` // not used in KVS, used for output
+	StatusTo_s string `json:"status_to_s"` // not used in KVS, used for output
 	TimeStamp string `json:"time_stamp"`
 	Note string `json:"note"`
 }
@@ -358,6 +360,8 @@ func (t *SimpleChaincode) get_request(stub *shim.ChaincodeStub, request_id strin
 		_, hiAsbytes, err := histIter.Next()
 		if err != nil {	return nil, errors.New("Error getting history data " )	}
 		if err = json.Unmarshal(hiAsbytes, &hist) ; err != nil { return nil, errors.New("Error unmarshalling data "+string(hiAsbytes))}
+		hist.StatusFrom_s = status_in_string(hist.StatusFrom)
+		hist.StatusTo_s = status_in_string(hist.StatusTo)
 		histories = append(histories,hist)
 	}
 	histIter.Close()
