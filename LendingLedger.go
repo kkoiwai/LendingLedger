@@ -276,6 +276,7 @@ func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, er
 			return nil, errors.New("Error unmarshalling data "+string(valAsbytes))
 		}
 
+		items = nil
 		itemsIter, err := stub.RangeQueryState( ITEM_KEY_PREFIX +req.RequestId+"/", ITEM_KEY_PREFIX +req.RequestId+"/~")
 		if err != nil {
 			return nil, errors.New("Unable to start the iterator")
@@ -292,7 +293,6 @@ func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, er
 		histAsbytes, err := stub.GetState(statusKey)
 		if err != nil {return nil, errors.New("Error getting customer data of "+statusKey)}
 		if err = json.Unmarshal(histAsbytes, &hist) ; err != nil {return nil, errors.New("Error unmarshalling data "+string(histAsbytes))}
-
 
 		record = RequestRecord{
 			RequestId:req.RequestId ,
@@ -321,8 +321,8 @@ func (t *SimpleChaincode) get_request(stub *shim.ChaincodeStub, request_id strin
 	var record RequestRecord
 	var items []Item
 	var item Item
-	//var histories []RequestHistory
-	var histories RequestHistories
+	var histories []RequestHistory
+	//var histories RequestHistories
 	var hist RequestHistory
 
 	// get request
@@ -332,6 +332,7 @@ func (t *SimpleChaincode) get_request(stub *shim.ChaincodeStub, request_id strin
 		return nil, errors.New("Error unmarshalling data "+string(valAsbytes))
 	}
 
+	items = nil
 	itemsIter, err := stub.RangeQueryState(ITEM_KEY_PREFIX +req.RequestId+"/", ITEM_KEY_PREFIX + req.RequestId+"/~")
 	if err != nil {
 		return nil, errors.New("Unable to start the iterator")
@@ -360,7 +361,8 @@ func (t *SimpleChaincode) get_request(stub *shim.ChaincodeStub, request_id strin
 		histories = append(histories,hist)
 	}
 	histIter.Close()
-	sort.Sort(histories)
+	//sort.Sort(histories)
+	histories = sort_history(histories)
 
 	record = RequestRecord{
 		RequestId:req.RequestId ,
@@ -456,6 +458,14 @@ func status_in_string(status int) (string) {
 	}
 	return val
 }
+
+func sort_history(history []RequestHistory) ([]RequestHistory){
+	var toSort RequestHistories= history
+	sort.Sort(toSort)
+	var sorted []RequestHistory = toSort
+	return sorted
+}
+
 
 //=================================================================================================================================
 //	 Main - main - Starts up the chaincode
