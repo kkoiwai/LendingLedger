@@ -355,8 +355,8 @@ func (t *SimpleChaincode) get_request(stub *shim.ChaincodeStub, request_id strin
 		return nil, errors.New("Unable to start the iterator")
 	}
 	for histIter.HasNext() {
-		_, hiAsbytes, err := itemsIter.Next()
-		if err != nil {	return nil, errors.New("Error getting history data ")	}
+		_, hiAsbytes, err := histIter.Next()
+		if err != nil {	return nil, errors.New("Error getting history data " )	}
 		if err = json.Unmarshal(hiAsbytes, &hist) ; err != nil { return nil, errors.New("Error unmarshalling data "+string(hiAsbytes))}
 		histories = append(histories,hist)
 	}
