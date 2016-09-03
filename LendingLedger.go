@@ -106,7 +106,7 @@ func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args [
 		return nil, nil
 	}else if len(args) == 1 {
 		// migrate from old chaincode. args[0] should have chaincode address
-		val, err := stub.QueryChaincode(args[0],"get_all", "" )
+		val, err := stub.QueryChaincode(args[0],"get_all", []string{} )
 		if err != nil {
 			return nil, errors.New("Unable to call chaincode " + args[0])
 		}
@@ -114,7 +114,7 @@ func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args [
 		var states interface{}
 		err = json.Unmarshal(val, &states)
 		if err != nil {
-			return nil, errors.New("Unable to marshal chaincode return value " + val)
+			return nil, errors.New("Unable to marshal chaincode return value " + string(val))
 		}
 		for _, stateIf := range states.([]interface{}){
 			state := stateIf.([]interface{})
