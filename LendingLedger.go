@@ -96,13 +96,42 @@ type RequestRecord struct{
 //	Init Function - Called when the user deploys the chaincode
 //==============================================================================================================================
 func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args []string) ([]byte, error) {
-	// init request_id counter
-	err := stub.PutState(REQ_CTR_KEY, []byte("00000"))
-	if err != nil {
-		return nil, errors.New("Unable to put the state")
+
+	if len(args) == 0 {
+		// init request_id counter
+		err := stub.PutState(REQ_CTR_KEY, []byte("00000"))
+		if err != nil {
+			return nil, errors.New("Unable to put the state")
+		}
+		return nil, nil
+	}else if len(args) == 1 {
+		// migrate from old chaincode. args[0] should have chaincode address
+		val, err := stub.QueryChaincode(args[0],"get_all", "" )
+		if err != nil {
+			return nil, errors.New("Unable to call chaincode " + args[0])
+		}
+
+		var states interface{}
+		err = json.Unmarshal(val, &states)
+		if err != nil {
+			return nil, errors.New("Unable to marshal chaincode return value " + val)
+		}
+		for _, stateIf := range states.([]interface{}){
+			state := stateIf.([]interface{})
+			stateKey := state[0].(string)
+			stateVal := state[1].([]byte)
+			err = stub.PutState(stateKey, stateVal)
+			if err != nil {
+				return nil, errors.New("Unable to PutState [ " + stateKey +" , "+ string(stateVal) + " ]")
+			}
+		}
+
+
+		return nil, nil
 	}
 
-	return nil, nil
+	return nil, errors.New("Invalid numbers of args.")
+
 }
 
 //==============================================================================================================================
