@@ -415,9 +415,11 @@ func (t *SimpleChaincode) get_request(stub *shim.ChaincodeStub, request_id strin
 	return []byte(bytes), nil
 }
 
+
 func (t *SimpleChaincode) get_all(stub *shim.ChaincodeStub) ([]byte, error) {
 
-	result := "["
+
+	var tupples [][]string
 
 	keysIter, err := stub.RangeQueryState("", "~")
 	if err != nil {
@@ -431,17 +433,13 @@ func (t *SimpleChaincode) get_all(stub *shim.ChaincodeStub) ([]byte, error) {
 		if iterErr != nil {
 			return nil, fmt.Errorf("keys operation failed. Error accessing state: %s", err)
 		}
-		result += " [ " + key + " , " + string(val) + " ] ,"
+		tupple := []string{ key , string(val) }
+		tupples=append(tupples, tupple)
 
 	}
 
-	if len(result) == 1 {
-		result = "[]"
-	} else {
-		result = result[:len(result) - 1] + "]"
-	}
-
-	return []byte(result), nil
+	marshalledTupples, err := json.Marshal(tupples)
+	return []byte(marshalledTupples), nil
 }
 
 func validate_timestamp(timestamp string) (bool) {
