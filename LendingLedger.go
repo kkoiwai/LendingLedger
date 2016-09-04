@@ -121,11 +121,11 @@ func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args [
 		for _, stateIf := range states.([]interface{}){
 			state := stateIf.([]interface{})
 			stateKey := state[0].(string)
-			stateVal := state[1].([]byte)
+			stateVal := state[1].(string)
 			if stateKey == "" {
 				return nil, errors.New("Unable to PutState: missing statekey [ " + stateKey +" , "+ string(stateVal) + " ]")
 			}
-			err = stub.PutState(stateKey, stateVal)
+			err = stub.PutState(stateKey, []byte(stateVal))
 			if err != nil {
 				return nil, errors.New("Unable to PutState [ " + stateKey +" , "+ string(stateVal) + " ]")
 			}
