@@ -110,21 +110,26 @@ func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args [
 		if err != nil {
 			return nil, errors.New("Unable to call chaincode " + args[0])
 		}
-
+		//return nil, errors.New("QueryChaincode: " + string(val))
 		var states interface{}
 		err = json.Unmarshal(val, &states)
 		if err != nil {
 			return nil, errors.New("Unable to marshal chaincode return value " + string(val))
 		}
 		//fmt.Printf("%+v", states)
+		//return nil, errors.New("QueryChaincode: " + fmt.Sprintf("%+v", states))
 		for _, stateIf := range states.([]interface{}){
 			state := stateIf.([]interface{})
 			stateKey := state[0].(string)
 			stateVal := state[1].([]byte)
+			if stateKey == "" {
+				return nil, errors.New("Unable to PutState: missing statekey [ " + stateKey +" , "+ string(stateVal) + " ]")
+			}
 			err = stub.PutState(stateKey, stateVal)
 			if err != nil {
 				return nil, errors.New("Unable to PutState [ " + stateKey +" , "+ string(stateVal) + " ]")
 			}
+			return nil, errors.New("DEBUG:  " + fmt.Sprintf("%+v", state))
 		}
 
 		next_ctr, err := stub.GetState(REQ_CTR_KEY)
