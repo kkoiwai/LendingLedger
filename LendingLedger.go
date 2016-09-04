@@ -129,7 +129,7 @@ func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args [
 			if err != nil {
 				return nil, errors.New("Unable to PutState [ " + stateKey +" , "+ string(stateVal) + " ]")
 			}
-			return nil, errors.New("DEBUG:  " + fmt.Sprintf("%+v", state))
+			//return nil, errors.New("DEBUG:  " + fmt.Sprintf("%+v", state))
 		}
 
 		next_ctr, err := stub.GetState(REQ_CTR_KEY)
