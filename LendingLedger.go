@@ -116,6 +116,7 @@ func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args [
 		if err != nil {
 			return nil, errors.New("Unable to marshal chaincode return value " + string(val))
 		}
+		//fmt.Printf("%+v", states)
 		for _, stateIf := range states.([]interface{}){
 			state := stateIf.([]interface{})
 			stateKey := state[0].(string)
@@ -126,6 +127,10 @@ func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args [
 			}
 		}
 
+		next_ctr, err := stub.GetState(REQ_CTR_KEY)
+		if err != nil || len(next_ctr) == 0 {
+			return nil, errors.New("Failed to GetState "+REQ_CTR_KEY)
+		}
 
 		return nil, nil
 	}
@@ -143,7 +148,6 @@ func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args [
 func (t *SimpleChaincode) Invoke(stub *shim.ChaincodeStub, function string, args []string) ([]byte, error) {
 
 	//caller, caller_affiliation, err := t.get_caller_data(stub)
-
 	//if err != nil { return nil, errors.New("Error retrieving caller information")}
 
 
@@ -170,6 +174,23 @@ func (t *SimpleChaincode) Invoke(stub *shim.ChaincodeStub, function string, args
 		items := args[4:4 + item_counts ]
 
 		return t.create_request(stub, lender_id, lendee_id, timestamp, items)
+
+	} else if function == "change_request_status" {
+
+		if len(args) < 5 {
+			fmt.Printf("Incorrect number of arguments passed"); return nil, errors.New("INVOKE: Incorrect number of arguments passed")
+		}
+
+		request_id := args[0]
+		status_from := args[1]
+		status_to := args[2]
+		timestamp := args[3]
+
+		if !validate_timestamp(timestamp) {
+			fmt.Printf("Timestamp: Incorrect format or too far from system clock "+timestamp); return nil, errors.New("INVOKE: Timestamp: Incorrect format or too far from system clock"+timestamp)
+		}
+
+		return t.change_request_status(stub, request_id, status_from, status_to, timestamp)
 
 	}
 	return nil, errors.New("Function of that name doesn't exist.")
@@ -281,6 +302,81 @@ func (t *SimpleChaincode) create_request(stub *shim.ChaincodeStub, lender_id str
 }
 
 
+func (t *SimpleChaincode) change_request_status(stub *shim.ChaincodeStub, request_id string, status_from string, status_to string, timestamp string) ([]byte, error) {
+
+	// check status_from -> status_to is a valid transition
+	// the followings are allowed combination.
+	// ITEMS_SHIPPED_TO_LENDER => ITEMS_RECEIVED_BY_LENDER
+	// ITEMS_RECEIVED_BY_LENDER =>ITEMS_SHIPPED_BY_LENDER
+	// ITEMS_SHIPPED_BY_LENDER => ITEMS_RECEIVED_BY_LENDEE
+
+	from, err := strconv.Atoi(status_from); if err != nil {panic(err)}
+	to, err := strconv.Atoi(status_to); if err != nil {panic(err)}
+	if 	( from == ITEMS_SHIPPED_TO_LENDER   && to == ITEMS_RECEIVED_BY_LENDER ) ||
+		( from ==  ITEMS_RECEIVED_BY_LENDER && to == ITEMS_SHIPPED_BY_LENDER) ||
+		( from == ITEMS_SHIPPED_BY_LENDER   && to == ITEMS_RECEIVED_BY_LENDEE) {
+		// OK.
+	} else {
+		return nil, errors.New("Invalid transision of status")
+	}
+
+	// Get Request
+	var req Request
+	reqKey := REQ_KEY_PREFIX + request_id
+	requestAsByte, err := stub.GetState( reqKey)
+	if err != nil {
+		return nil, errors.New("Unable to get the state " + reqKey)
+	}
+	if err = json.Unmarshal(requestAsByte, &req) ; err != nil {
+		return nil, errors.New("Error unmarshalling data "+string(requestAsByte))
+	}
+
+	// Get RequestHistory and check if the current status is equal to status_from
+	var hist RequestHistory
+	statusKey:= HIST_KEY_PREFIX +req.RequestId+"/"+req.LatestHistoryId
+	histAsbytes, err := stub.GetState(statusKey)
+	if err != nil {return nil, errors.New("Error getting history data of "+statusKey)}
+	if err = json.Unmarshal(histAsbytes, &hist) ; err != nil {return nil, errors.New("Error unmarshalling data "+string(histAsbytes))}
+	if hist.StatusTo != from {return nil, errors.New("Error: current status and status_from doesn't match.")}
+
+	// Register RequestHistory
+	hid, err := strconv.Atoi(string(hist.HistoryId) ); if err != nil {panic(err)}
+	str:=strings.Repeat("0",5)+ strconv.Itoa(hid + 1)
+	newHid := str[len(str)-5:]
+	newHist:=RequestHistory{
+		RequestId:request_id,
+		HistoryId:newHid, //00000
+		StatusFrom:REQUEST_CREATED,
+		StatusTo:ITEMS_SHIPPED_TO_LENDER,
+		TimeStamp:timestamp,
+		Note:"",
+	}
+	newHistKey := HIST_KEY_PREFIX + newHist.RequestId+"/"+newHist.HistoryId
+	newHistBytes, err := json.Marshal(newHist)
+	if err != nil {
+		return nil, errors.New("Error creating newHist record")
+	}
+	err = stub.PutState( newHistKey, []byte(newHistBytes))
+	if err != nil {
+		return nil, errors.New("Unable to put the state")
+	}
+
+
+	//increment LatestHistoryId
+	req.LatestHistoryId = newHist.HistoryId
+	newReqBytes, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.New("Error creating newHist record")
+	}
+	err = stub.PutState( reqKey, []byte(newReqBytes))
+	if err != nil {
+		return nil, errors.New("Unable to put the state " + reqKey)
+	}
+
+
+	return nil, nil
+}
+
 func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, error) {
 
 	var rset RequestSet
@@ -322,7 +418,7 @@ func (t *SimpleChaincode) get_all_requests(stub *shim.ChaincodeStub) ([]byte, er
 
 		statusKey:= HIST_KEY_PREFIX +req.RequestId+"/"+req.LatestHistoryId
 		histAsbytes, err := stub.GetState(statusKey)
-		if err != nil {return nil, errors.New("Error getting customer data of "+statusKey)}
+		if err != nil {return nil, errors.New("Error getting history data of "+statusKey)}
 		if err = json.Unmarshal(histAsbytes, &hist) ; err != nil {return nil, errors.New("Error unmarshalling data "+string(histAsbytes))}
 
 		record = RequestRecord{
@@ -486,6 +582,19 @@ func status_in_string(status int) (string) {
 		case ITEMS_RECEIVED_BY_LENDER : val = "ITEMS_RECEIVED_BY_LENDER"  //  lendee has received the item
 		case ITEMS_SHIPPED_BY_LENDER : val = "ITEMS_SHIPPED_BY_LENDER" //  lendee has sent back the item
 		case ITEMS_RECEIVED_BY_LENDEE : val = "ITEMS_RECEIVED_BY_LENDEE"  //  lender has received the item back
+	}
+	return val
+}
+
+
+func status_in_int(status string) (int) {
+	var val int
+	switch status{
+		case "REQUEST_CREATED" : val = REQUEST_CREATED //  initial state, items can only be added at this state.
+		case "ITEMS_SHIPPED_TO_LENDER": val = ITEMS_SHIPPED_TO_LENDER //  lender has sent the item
+		case "ITEMS_RECEIVED_BY_LENDER" : val = ITEMS_RECEIVED_BY_LENDER  //  lendee has received the item
+		case "ITEMS_SHIPPED_BY_LENDER" : val = ITEMS_SHIPPED_BY_LENDER //  lendee has sent back the item
+		case "ITEMS_RECEIVED_BY_LENDEE" : val = ITEMS_RECEIVED_BY_LENDEE  //  lender has received the item back
 	}
 	return val
 }
